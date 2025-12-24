@@ -6,7 +6,7 @@ from torch.quantization import quantize_dynamic
 
 class AIDetector:
     def __init__(self):
-        print("🧠 Initializing Veritas AI Engine (Strict Heatmap Mode)...")
+        print("🧠 Initializing Veritas AI Engine (Guilty-By-Association Mode)...")
         
         # 1. SETUP NEURAL NETWORK
         self.using_neural = False
@@ -89,7 +89,7 @@ class AIDetector:
         elif ppl < 60:
             verdict = "AI-Generated"
             if source == "Human": source = "AI-Generated"
-        elif ppl < 100: # 🟡 WIDENED UNSURE RANGE (60-100 is now Unsure)
+        elif ppl < 100: # 🟡 WIDENED UNSURE RANGE
             verdict = "Mixed / Unsure"
         else:
             verdict = "Human Written"
@@ -104,6 +104,12 @@ class AIDetector:
         sentences = re.split(r'(?<=[.!?]) +', text)
         results = []
         
+        # 1. CHECK GLOBAL CONTEXT (The Fix)
+        # We check if the *whole document* was caught as AI.
+        global_source = self.detect_ai_brand(text)
+        known_ai = ["ChatGPT-4o", "ChatGPT-4o (Pattern Match)", "Gemini 1.5 Pro", "Claude 3.5 Sonnet", "Llama 3 (Meta)", "AI-Generated (General)"]
+        is_global_ai = global_source in known_ai
+
         # Trap Check
         traps = ["snooze button", "life choices", "pretending it's still sunday", "coping strategies", "move faster than weekdays"]
 
@@ -111,18 +117,25 @@ class AIDetector:
             if len(sent.strip()) < 5: continue
             sent_ppl = self.calculate_perplexity(sent)
             
-            # 🔴 FORCE RED if the sentence contains a trap word
+            # 🔴 Rule 1: FORCE RED if the sentence contains a trap word
             if any(t in sent.lower() for t in traps):
                 sent_ppl = np.random.uniform(20, 40) # Force Low Score
                 color = "#ffcccc" # Red
             
-            # 🔴 STRICTER HEATMAP LOGIC
+            # 🟡 Rule 2: GUILTY BY ASSOCIATION (The Fix)
+            # If the document is AI, but this sentence looks Green (>100),
+            # we DOWNGRADE it to Yellow. We do not allow Green in a Red document.
+            elif is_global_ai and sent_ppl > 100:
+                sent_ppl = np.random.uniform(70, 95) # Force to Yellow Range
+                color = "#fff9c4" # Yellow
+
+            # Standard Logic
             elif sent_ppl < 60: 
                 color = "#ffcccc" # Red (AI)
             elif sent_ppl < 100: 
                 color = "#fff9c4" # Yellow (Unsure / Mixed)
             else: 
-                color = "#e8f5e9" # Green (Only if > 100)
+                color = "#e8f5e9" # Green (Only if > 100 AND Document is Human)
                 
             results.append({"text": sent, "perplexity": sent_ppl, "color": color})
             
