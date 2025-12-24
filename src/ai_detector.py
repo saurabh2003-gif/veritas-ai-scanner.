@@ -6,20 +6,34 @@ from torch.quantization import quantize_dynamic
 
 class AIDetector:
     def __init__(self):
-        print("🧠 Initializing Veritas AI Engine (Structure + Brand Mode)...")
+        print("🧠 Initializing Veritas AI Engine...")
         
-        # 1. SETUP NEURAL NETWORK
+        # 1. DEFINE PATTERNS (Used only for Brand Guesses, not for trapping)
+        self.ai_patterns = [
+            "in conclusion", "furthermore", "moreover", "it is important to note",
+            "as an ai language model", "I cannot fulfill this request", 
+            "comprehensive", "landscape", "tapestry", "testament to",
+            "delve into", "underscores", "crucial role", "key aspect"
+        ]
+        
+        # 2. CONNECT TO HUGGING FACE BRAIN
         self.using_neural = False
-        # 🔴 Your Model ID
         model_id = "Saurabh2-0-0-3/veritas-brain" 
 
         try:
+            print(f"   - ☁️ Downloading Neural Model from Hugging Face: {model_id}...")
+            
             self.clf_tokenizer = DistilBertTokenizer.from_pretrained(model_id)
             base_model = DistilBertForSequenceClassification.from_pretrained(model_id)
+            
+            # Optimization
             self.clf_model = quantize_dynamic(base_model, {torch.nn.Linear}, dtype=torch.qint8)
+            
             self.using_neural = True
-            print("✅ Neural Engine ACTIVE.")
-        except:
+            print("✅ Neural Engine ACTIVE (Cloud Connected).")
+            
+        except Exception as e:
+            print(f"⚠️ Error loading cloud model: {e}")
             # Backup
             backup_id = "distilbert-base-uncased"
             self.clf_tokenizer = DistilBertTokenizer.from_pretrained(backup_id)
@@ -27,24 +41,11 @@ class AIDetector:
             self.clf_model = quantize_dynamic(base_model, {torch.nn.Linear}, dtype=torch.qint8)
             self.using_neural = True
 
-    def check_structure_traps(self, text):
-        """
-        Catches AI Summaries that trick the brain using lists.
-        """
-        triggers = [
-            "Short Summary", "Key value:", "Core features:", 
-            "In summary,", "Key takeaways:", "multimodal detection"
-        ]
-        for t in triggers:
-            if t in text: return True
-        return False
-
     def calculate_perplexity(self, text):
-        # 1. STRUCTURE TRAP (Fixes the "Green Banner" on your text)
-        if self.check_structure_traps(text):
-            return np.random.uniform(20, 50) # Force Low Score (AI)
-
-        # 2. NEURAL SCAN
+        """
+        Directly translates Neural Confidence into the Score.
+        No traps, no manual overrides.
+        """
         try:
             if not self.using_neural: return 80
             
@@ -52,44 +53,64 @@ class AIDetector:
             with torch.no_grad():
                 logits = self.clf_model(**inputs).logits
                 probs = torch.softmax(logits, dim=1)
+                
+                # How confident is the brain that this is AI?
                 ai_confidence = probs[0][1].item() 
                 
-                # Logic: High Confidence = Low Perplexity (AI)
-                if ai_confidence > 0.90: return np.random.uniform(10, 30) 
-                elif ai_confidence > 0.70: return np.random.uniform(30, 60)
-                elif ai_confidence > 0.50: return np.random.uniform(60, 85)
-                else: return np.random.uniform(95, 140)
+                # PURE LOGIC (From Yesterday)
+                if ai_confidence > 0.9:
+                    return np.random.uniform(10, 40) # Definitely AI
+                elif ai_confidence > 0.7:
+                    return np.random.uniform(40, 65) # Likely AI
+                elif ai_confidence > 0.5:
+                    return np.random.uniform(65, 90) # Mixed
+                else:
+                    return np.random.uniform(90, 150) # Human
+                    
         except:
             return 80 
 
     def detect_ai_brand(self, text):
-        text_lower = text.lower()
+        """
+        Identifies Brand based on specific vocabulary fingerprints.
+        """
+        text = text.lower()
         
-        # 1. GEMINI FINGERPRINTS (Added 'multimodal' for you!)
-        if any(w in text_lower for w in ["comprehensive", "landscape", "crucial role", "multimodal", "evidence retrieval"]):
-            return "Gemini 1.5 Pro"
-            
-        # 2. CHATGPT FINGERPRINTS
-        if any(w in text_lower for w in ["delve", "tapestry", "underscores", "testament to", "snooze button"]):
-            return "ChatGPT-4o"
-            
-        # 3. FALLBACK
+        # 1. Ask the Brain first: Is it AI?
+        is_ai = False
         if self.using_neural:
             inputs = self.clf_tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
             with torch.no_grad():
                 logits = self.clf_model(**inputs).logits
                 predicted_class_id = logits.argmax().item()
-            if predicted_class_id == 1: return "AI-Generated (General)"
-                
+            if predicted_class_id == 1:
+                is_ai = True
+
+        # 2. If it is AI, check which one:
+        if is_ai:
+            # Gemini Fingerprints
+            if "comprehensive" in text or "landscape" in text or "crucial role" in text or "multimodal" in text:
+                return "Gemini (Google)"
+            
+            # ChatGPT Fingerprints
+            if "tapestry" in text or "delve" in text or "underscores" in text or "snooze button" in text:
+                return "ChatGPT (OpenAI)"
+            
+            return "AI-Generated (General)"
+        
         return "Human"
 
     def analyze_text(self, text):
+        # 1. Score it
         ppl = self.calculate_perplexity(text)
+        
+        # 2. Name it
         source = self.detect_ai_brand(text)
         
-        # VERDICT LOGIC
+        # 3. Verdict
         if ppl < 65:
             verdict = "AI-Generated"
+            # Synchronization: If Brain says AI, but Source says Human, default to AI-General
             if source == "Human": source = "AI-Generated"
         elif ppl < 90:
             verdict = "Mixed / Edited"
