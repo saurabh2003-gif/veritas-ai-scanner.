@@ -6,7 +6,7 @@ from torch.quantization import quantize_dynamic
 
 class AIDetector:
     def __init__(self):
-        print("🧠 Initializing Veritas AI Engine (Guilty-By-Association Mode)...")
+        print("🧠 Initializing Veritas AI Engine (Natural Mix Mode)...")
         
         # 1. SETUP NEURAL NETWORK
         self.using_neural = False
@@ -34,12 +34,12 @@ class AIDetector:
                 probs = torch.softmax(logits, dim=1)
                 ai_confidence = probs[0][1].item() 
                 
-                # 🔴 STRICTER SCORING (Harder to get Green)
+                # 🔴 STRICT SCORING (Harder to get Green)
                 if ai_confidence > 0.90: return np.random.uniform(10, 30)   # Red
                 elif ai_confidence > 0.70: return np.random.uniform(30, 60) # Red
-                # If confidence is > 40% (Unsure), force Yellow score (60-95)
-                elif ai_confidence > 0.40: return np.random.uniform(60, 95) 
-                else: return np.random.uniform(100, 140)                    # Green (Only if very sure)
+                # If confidence is > 40% (Unsure), force Yellow score (60-115)
+                elif ai_confidence > 0.40: return np.random.uniform(60, 115) 
+                else: return np.random.uniform(120, 140)                    # Green (Strict: 120+)
         except:
             return 80 
 
@@ -84,12 +84,12 @@ class AIDetector:
         if source in known_ai:
             verdict = "AI-Generated"
             # Force Score Low
-            if ppl > 60: ppl = np.random.uniform(25, 45)
+            if ppl > 65: ppl = np.random.uniform(25, 45)
         
         elif ppl < 60:
             verdict = "AI-Generated"
             if source == "Human": source = "AI-Generated"
-        elif ppl < 100: # 🟡 WIDENED UNSURE RANGE
+        elif ppl < 120: # 🟡 WIDENED UNSURE RANGE (60-120 is now Unsure)
             verdict = "Mixed / Unsure"
         else:
             verdict = "Human Written"
@@ -104,12 +104,6 @@ class AIDetector:
         sentences = re.split(r'(?<=[.!?]) +', text)
         results = []
         
-        # 1. CHECK GLOBAL CONTEXT (The Fix)
-        # We check if the *whole document* was caught as AI.
-        global_source = self.detect_ai_brand(text)
-        known_ai = ["ChatGPT-4o", "ChatGPT-4o (Pattern Match)", "Gemini 1.5 Pro", "Claude 3.5 Sonnet", "Llama 3 (Meta)", "AI-Generated (General)"]
-        is_global_ai = global_source in known_ai
-
         # Trap Check
         traps = ["snooze button", "life choices", "pretending it's still sunday", "coping strategies", "move faster than weekdays"]
 
@@ -122,20 +116,17 @@ class AIDetector:
                 sent_ppl = np.random.uniform(20, 40) # Force Low Score
                 color = "#ffcccc" # Red
             
-            # 🟡 Rule 2: GUILTY BY ASSOCIATION (The Fix)
-            # If the document is AI, but this sentence looks Green (>100),
-            # we DOWNGRADE it to Yellow. We do not allow Green in a Red document.
-            elif is_global_ai and sent_ppl > 100:
-                sent_ppl = np.random.uniform(70, 95) # Force to Yellow Range
-                color = "#fff9c4" # Yellow
-
-            # Standard Logic
+            # 🔴 Rule 2: Low Score = Red
             elif sent_ppl < 60: 
                 color = "#ffcccc" # Red (AI)
-            elif sent_ppl < 100: 
-                color = "#fff9c4" # Yellow (Unsure / Mixed)
+                
+            # 🟡 Rule 3: Middle Score (60-120) = Dark Yellow
+            elif sent_ppl < 120: 
+                color = "#ffca28" # Dark Warning Yellow
+                
+            # 🟢 Rule 4: High Score (>120) = Green
             else: 
-                color = "#e8f5e9" # Green (Only if > 100 AND Document is Human)
+                color = "#e8f5e9" # Green
                 
             results.append({"text": sent, "perplexity": sent_ppl, "color": color})
             
