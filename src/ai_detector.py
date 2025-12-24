@@ -6,7 +6,7 @@ from torch.quantization import quantize_dynamic
 
 class AIDetector:
     def __init__(self):
-        print("🧠 Initializing Veritas AI Engine (High-Accuracy Visual Mode)...")
+        print("🧠 Initializing Veritas AI Engine (Brand Restoration Mode)...")
         
         # 1. SETUP NEURAL NETWORK
         self.using_neural = False
@@ -50,17 +50,28 @@ class AIDetector:
         if any(t in text_lower for t in traps):
             return "ChatGPT-4o (Pattern Match)"
 
-        # 2. Known AI Brands
-        ai_fingerprints = [
-            "delve", "tapestry", "underscores", "testament to", "regenerate response", # ChatGPT
-            "comprehensive", "landscape", "crucial role", "multimodal", "evidence retrieval", # Gemini
-            "certainly", "here is a summary", "anthropic", # Claude
-            "as an ai", "meta ai", "llama", # Llama
-            "transformer models", "stylometric", "ai-generated content" # Technical/Fake News
-        ]
-        if any(f in text_lower for f in ai_fingerprints):
-            return "AI-Generated (Pattern Match)"
+        # 2. SEPARATE BRAND CHECKS (Restored Logic)
         
+        # ChatGPT-4o
+        if any(w in text_lower for w in ["delve", "tapestry", "underscores", "testament to", "regenerate response"]):
+            return "ChatGPT-4o"
+            
+        # Gemini 1.5 Pro
+        if any(w in text_lower for w in ["comprehensive", "landscape", "crucial role", "multimodal", "evidence retrieval"]):
+            return "Gemini 1.5 Pro"
+            
+        # Claude 3.5 Sonnet
+        if any(w in text_lower for w in ["certainly", "here is a summary", "i do not have personal opinions", "anthropic"]):
+            return "Claude 3.5 Sonnet"
+            
+        # Llama 3 (Meta)
+        if any(w in text_lower for w in ["as an ai", "meta ai", "llama", "i cannot verify"]):
+            return "Llama 3 (Meta)"
+            
+        # Technical / Fake News Generic
+        if any(w in text_lower for w in ["transformer models", "stylometric", "ai-generated content"]):
+            return "AI-Generated (Technical)"
+
         # Fallback Neural Check
         if self.using_neural:
             inputs = self.clf_tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
@@ -75,7 +86,12 @@ class AIDetector:
         ppl = self.calculate_perplexity(text)
         source = self.detect_ai_brand(text)
         
-        known_ai = ["ChatGPT-4o", "ChatGPT-4o (Pattern Match)", "Gemini 1.5 Pro", "Claude 3.5 Sonnet", "Llama 3 (Meta)", "AI-Generated (General)", "AI-Generated (Pattern Match)"]
+        # LIST OF KNOWN AI SOURCES
+        known_ai = [
+            "ChatGPT-4o", "ChatGPT-4o (Pattern Match)", 
+            "Gemini 1.5 Pro", "Claude 3.5 Sonnet", "Llama 3 (Meta)", 
+            "AI-Generated (General)", "AI-Generated (Technical)"
+        ]
         
         # Global Verdict: If trap found, force AI verdict
         if source in known_ai:
